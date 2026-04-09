@@ -114,15 +114,12 @@ app_license = "MIT"
 
 # Document Events
 # ---------------
-# Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+    "NMI Settings": {
+        "on_update": "frappe_payments.utils.payment_settings.invalidate_settings_cache",
+    },
+}
 
 # Scheduled Tasks
 # ---------------

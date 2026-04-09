@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NMI Payment Test</title>
+
+  <script
+    src="https://secure.networkmerchants.com/token/Collect.js"
+    data-tokenization-key="5QHCk6-52zwsz-8e73pq-fu8797"
+    data-variant="inline"
+  ></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f0f4f8;
+      display: flex;
+      justify-content: center;
+      padding: 40px 16px;
+      min-height: 100vh;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      padding: 32px;
+      width: 100%;
+      max-width: 560px;
+    }
+
+    h2 { font-size: 1.3rem; color: #1a202c; margin-bottom: 4px; }
+    .subtitle { font-size: 0.85rem; color: #718096; margin-bottom: 24px; }
+
+    .section-title {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #a0aec0;
+      margin: 20px 0 10px;
+      border-bottom: 1px solid #edf2f7;
+      padding-bottom: 4px;
+    }
+
+    .row { display: flex; gap: 12px; }
+    .row .field { flex: 1; }
+    .field { margin-bottom: 14px; }
+
+    label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: #4a5568;
+      margin-bottom: 5px;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 7px;
+      font-size: 0.88rem;
+      color: #2d3748;
+      outline: none;
+      transition: border-color 0.15s;
+      background: #fff;
+    }
+    input:focus, select:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.15); }
+
+    /* Items table */
+    .items-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-bottom: 10px; }
+    .items-table th {
+      text-align: left;
+      font-weight: 500;
+      color: #718096;
+      padding: 4px 6px;
+      border-bottom: 1px solid #edf2f7;
+    }
+    .items-table td { padding: 6px 6px; vertical-align: middle; }
+    .items-table input { padding: 6px 8px; font-size: 0.82rem; }
+    .btn-remove {
+      width: 28px; height: 28px;
+      border: none; border-radius: 50%;
+      background: #fed7d7; color: #c53030;
+      cursor: pointer; font-size: 1rem; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .btn-add {
+      font-size: 0.8rem;
+      color: #667eea;
+      background: none;
+      border: 1px dashed #667eea;
+      border-radius: 6px;
+      padding: 5px 12px;
+      cursor: pointer;
+      width: 100%;
+      margin-bottom: 4px;
+    }
+    .btn-add:hover { background: #ebf4ff; }
+
+    /* Collect.js hosted card fields */
+    .collect-field {
+      border: 1px solid #e2e8f0;
+      border-radius: 7px;
+      padding: 10px 12px;
+      height: 42px;
+      background: #fff;
+      transition: border-color 0.15s;
+    }
+    .collect-field.CollectJSValid   { border-color: #48bb78; }
+    .collect-field.CollectJSInvalid { border-color: #f56565; }
+
+    .test-cards {
+      background: #f7fafc;
+      border: 1px dashed #cbd5e0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      font-size: 0.8rem;
+      color: #4a5568;
+      line-height: 1.9;
+    }
+    .test-cards strong { color: #2d3748; display: block; margin-bottom: 2px; }
+    .test-cards code {
+      font-family: monospace;
+      background: #edf2f7;
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+
+    .token-badge {
+      background: #ebf8ff;
+      border: 1px solid #bee3f8;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 0.75rem;
+      color: #2b6cb0;
+      font-family: monospace;
+      word-break: break-all;
+      margin: 10px 0;
+      display: none;
+    }
+
+    button.pay-btn {
+      width: 100%;
+      padding: 13px;
+      background: #667eea;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    button.pay-btn:hover:not(:disabled) { background: #5a67d8; }
+    button.pay-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .status {
+      margin-top: 16px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      display: none;
+      line-height: 1.5;
+    }
+    .status.info    { background: #ebf8ff; color: #2b6cb0; border: 1px solid #bee3f8; display: block; }
+    .status.success { background: #f0fff4; color: #276749; border: 1px solid #9ae6b4; display: block; }
+    .status.error   { background: #fff5f5; color: #c53030; border: 1px solid #feb2b2; display: block; }
+
+    pre {
+      background: #2d3748;
+      color: #e2e8f0;
+      border-radius: 7px;
+      padding: 14px;
+      font-size: 0.75rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin-top: 14px;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h2>NMI Payment Test</h2>
+  <p class="subtitle">Sandbox — no real charges</p>
+
+  <div class="test-cards">
+    <strong>Test card numbers</strong>
+    Visa: <code>4111111111111111</code><br>
+    Mastercard: <code>5431111111111111</code><br>
+    Expiry: <code>12/29</code> &nbsp;&nbsp; CVV: <code>999</code>
+  </div>
+
+  <!-- ── Customer ─────────────────────────────────────── -->
+  <div class="section-title">Customer</div>
+
+  <div class="row">
+    <div class="field">
+      <label>Full Name</label>
+      <input id="customer_name" value="John Doe" />
+    </div>
+    <div class="field">
+      <label>Phone</label>
+      <input id="phone" value="+8801700000000" />
+    </div>
+  </div>
+  <div class="field">
+    <label>Email</label>
+    <input id="email" type="email" value="excel.azmin@gmail.com" />
+  </div>
+
+  <!-- ── Items ─────────────────────────────────────────── -->
+  <div class="section-title">Order Items</div>
+
+  <table class="items-table">
+    <thead>
+      <tr>
+        <th style="width:70%">Item Code</th>
+        <th style="width:15%">Qty</th>
+        <th style="width:15%"></th>
+      </tr>
+    </thead>
+    <tbody id="items-body">
+      <tr>
+        <td><input class="item-code" value="Truemed Glucosamine Sulfate KCL with Chondroitin and MSM" /></td>
+        <td><input class="item-qty" type="number" value="2" min="1" style="width:60px" /></td>
+        <td><button class="btn-remove" onclick="removeRow(this)">×</button></td>
+      </tr>
+      <tr>
+        <td><input class="item-code" value="LUTEIN with Zeaxanthin (20mg Lutein + 4mg Zeaxanthin)-100 mg-RED" /></td>
+        <td><input class="item-qty" type="number" value="1" min="1" style="width:60px" /></td>
+        <td><button class="btn-remove" onclick="removeRow(this)">×</button></td>
+      </tr>
+    </tbody>
+  </table>
+  <button class="btn-add" onclick="addRow()">+ Add Item</button>
+
+  <!-- ── Billing Address ──────────────────────────────── -->
+  <div class="section-title">Billing Address</div>
+
+  <div class="field">
+    <label>Address Line 1</label>
+    <input id="bill_address_line1" value="123 Gulshan Ave" />
+  </div>
+  <div class="row">
+    <div class="field">
+      <label>City</label>
+      <input id="bill_city" value="Dhaka" />
+    </div>
+    <div class="field">
+      <label>State</label>
+      <input id="bill_state" value="Dhaka" />
+    </div>
+  </div>
+  <div class="row">
+    <div class="field">
+      <label>Pincode</label>
+      <input id="bill_pincode" value="1212" />
+    </div>
+    <div class="field">
+      <label>Country</label>
+      <input id="bill_country" value="Bangladesh" />
+    </div>
+  </div>
+
+  <!-- ── Shipping Address ─────────────────────────────── -->
+  <div class="section-title">Shipping Address</div>
+
+  <div class="field" style="margin-bottom:8px">
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+      <input type="checkbox" id="same_as_billing" checked onchange="toggleShipping()" />
+      Same as billing address
+    </label>
+  </div>
+
+  <div id="shipping-fields" style="display:none">
+    <div class="field">
+      <label>Address Line 1</label>
+      <input id="ship_address_line1" value="123 Gulshan Ave" />
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>City</label>
+        <input id="ship_city" value="Dhaka" />
+      </div>
+      <div class="field">
+        <label>State</label>
+        <input id="ship_state" value="Dhaka" />
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Pincode</label>
+        <input id="ship_pincode" value="1212" />
+      </div>
+      <div class="field">
+        <label>Country</label>
+        <input id="ship_country" value="Bangladesh" />
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Notes ────────────────────────────────────────── -->
+  <div class="section-title">Notes</div>
+  <div class="field">
+    <input id="notes" value="Please call before delivery" />
+  </div>
+
+  <!-- ── Card (Collect.js hosted fields) ──────────────── -->
+  <div class="section-title">Card Details</div>
+
+  <div class="field">
+    <label>Card Number</label>
+    <div id="ccnumber" class="collect-field"></div>
+  </div>
+  <div class="row">
+    <div class="field">
+      <label>Expiry (MM/YY)</label>
+      <div id="ccexp" class="collect-field"></div>
+    </div>
+    <div class="field">
+      <label>CVV</label>
+      <div id="cvv" class="collect-field"></div>
+    </div>
+  </div>
+
+  <div id="token-badge" class="token-badge"></div>
+
+  <button id="pay-btn" class="pay-btn" disabled>Loading payment fields…</button>
+
+  <div id="status" class="status"></div>
+  <pre id="response-box" style="display:none"></pre>
+</div>
+
+<script>
+  const API_BASE   = window.location.origin;
+  const CHARGE_URL = `${API_BASE}/api/method/frappe_payments.api.nmi.charge.charge`;
+
+  const payBtn      = document.getElementById("pay-btn");
+  const statusEl    = document.getElementById("status");
+  const responseBox = document.getElementById("response-box");
+  const tokenBadge  = document.getElementById("token-badge");
+
+  // ── Shipping toggle ──────────────────────────────────────────────────────
+  function toggleShipping() {
+    const same = document.getElementById("same_as_billing").checked;
+    document.getElementById("shipping-fields").style.display = same ? "none" : "block";
+  }
+
+  // ── Items table ──────────────────────────────────────────────────────────
+  function addRow() {
+    const tbody = document.getElementById("items-body");
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><input class="item-code" placeholder="Item Code" /></td>
+      <td><input class="item-qty" type="number" value="1" min="1" style="width:60px" /></td>
+      <td><button class="btn-remove" onclick="removeRow(this)">×</button></td>`;
+    tbody.appendChild(tr);
+  }
+
+  function removeRow(btn) {
+    const rows = document.querySelectorAll("#items-body tr");
+    if (rows.length > 1) btn.closest("tr").remove();
+  }
+
+  function getItems() {
+    return Array.from(document.querySelectorAll("#items-body tr")).map(tr => ({
+      item_code: tr.querySelector(".item-code").value.trim(),
+      qty: parseInt(tr.querySelector(".item-qty").value, 10) || 1,
+    })).filter(r => r.item_code);
+  }
+
+  // ── CSRF ─────────────────────────────────────────────────────────────────
+  function getCsrfToken() {
+    const m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+    return m ? decodeURIComponent(m[1]) : "";
+  }
+
+  async function ensureCsrfToken() {
+    if (getCsrfToken()) return getCsrfToken();
+    try {
+      await fetch(`${API_BASE}/api/method/frappe.ping`, { credentials: "include" });
+    } catch (_) {}
+    return getCsrfToken();
+  }
+
+  // ── Collect.js ───────────────────────────────────────────────────────────
+  CollectJS.configure({
+    variant: "inline",
+    styleSniffer: false,
+    fields: {
+      ccnumber: { selector: "#ccnumber", placeholder: "Card number" },
+      ccexp:    { selector: "#ccexp",    placeholder: "MM / YY" },
+      cvv:      { selector: "#cvv",      placeholder: "CVV" },
+    },
+    customCss: {
+      "font-size": "14px",
+      "color": "#2d3748",
+      "font-family": "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    },
+    invalidCss: { "color": "#c53030" },
+    validCss:   { "color": "#276749" },
+
+    fieldsAvailableCallback() {
+      payBtn.disabled = false;
+      payBtn.textContent = "Pay Now";
+    },
+
+    callback(response) {
+      const token = response.token;
+      tokenBadge.textContent = `Token: ${token}`;
+      tokenBadge.style.display = "block";
+      submitCharge(token);
+    },
+  });
+
+  payBtn.addEventListener("click", () => {
+    const items = getItems();
+    if (!items.length) {
+      showStatus("error", "Add at least one item before paying.");
+      return;
+    }
+    clearStatus();
+    payBtn.disabled = true;
+    payBtn.textContent = "Tokenizing card…";
+    CollectJS.startPaymentRequest();
+  });
+
+  // ── Submit charge ─────────────────────────────────────────────────────────
+  async function submitCharge(token) {
+    showStatus("info", "Charging card and creating invoice…");
+
+    const csrfToken = await ensureCsrfToken();
+
+    const sameAddr = document.getElementById("same_as_billing").checked;
+
+    const billingAddress = {
+      address_line1: document.getElementById("bill_address_line1").value.trim(),
+      city:          document.getElementById("bill_city").value.trim(),
+      state:         document.getElementById("bill_state").value.trim(),
+      pincode:       document.getElementById("bill_pincode").value.trim(),
+      country:       document.getElementById("bill_country").value.trim(),
+    };
+
+    const shippingAddress = sameAddr ? billingAddress : {
+      address_line1: document.getElementById("ship_address_line1").value.trim(),
+      city:          document.getElementById("ship_city").value.trim(),
+      state:         document.getElementById("ship_state").value.trim(),
+      pincode:       document.getElementById("ship_pincode").value.trim(),
+      country:       document.getElementById("ship_country").value.trim(),
+    };
+
+    const body = {
+      customer_name:    document.getElementById("customer_name").value.trim(),
+      email:            document.getElementById("email").value.trim(),
+      phone:            document.getElementById("phone").value.trim(),
+      payment_token:    token,
+      items:            JSON.stringify(getItems()),
+      billing_address:  JSON.stringify(billingAddress),
+      shipping_address: JSON.stringify(shippingAddress),
+      notes:            document.getElementById("notes").value.trim(),
+    };
+
+    try {
+      const resp = await fetch(CHARGE_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-Frappe-CSRF-Token": csrfToken,
+        },
+        body: new URLSearchParams(body),
+      });
+
+      const data = await resp.json();
+
+      if (data.message?.success) {
+        const d = data.message.data;
+        showStatus("success",
+          `✓ Payment approved!\n` +
+          `Transaction ID : ${d.transaction_id}\n` +
+          `Invoice        : ${d.invoice.name}\n` +
+          `Payment Entry  : ${d.payment_entry}\n` +
+          `Grand Total    : ${d.invoice.currency} ${d.invoice.grand_total}`
+        );
+      } else {
+        const err = data.error_data || data;
+        showStatus("error", `Error ${err.error_code || ""}: ${err.message || JSON.stringify(err)}`);
+      }
+
+      showResponse(data);
+    } catch (err) {
+      showStatus("error", `Network error: ${err.message}`);
+    } finally {
+      payBtn.disabled = false;
+      payBtn.textContent = "Pay Now";
+    }
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function showStatus(type, msg) {
+    statusEl.className = `status ${type}`;
+    statusEl.style.whiteSpace = "pre-line";
+    statusEl.textContent = msg;
+  }
+
+  function clearStatus() {
+    statusEl.className = "status";
+    statusEl.textContent = "";
+    responseBox.style.display = "none";
+    tokenBadge.style.display = "none";
+  }
+
+  function showResponse(data) {
+    responseBox.style.display = "block";
+    responseBox.textContent = JSON.stringify(data, null, 2);
+  }
+</script>
+</body>
+</html>
