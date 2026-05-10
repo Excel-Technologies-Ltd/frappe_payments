@@ -585,7 +585,6 @@ def _serialize_invoice(doc) -> dict:
         "customer":               doc.customer,
         "customer_name":          doc.customer_name,
         "status":                 doc.status,
-        "image":                  doc.image,
         "posting_date":           str(doc.posting_date),
         "due_date":               str(doc.due_date),
         "currency":               doc.currency,
@@ -598,11 +597,13 @@ def _serialize_invoice(doc) -> dict:
         "items": [
             {
                 "item_code": row.item_code,
+                "image":     row.image,
                 "item_name": row.item_name,
                 "qty":       flt(row.qty),
                 "uom":       row.uom,
                 "rate":      flt(row.rate),
                 "amount":    flt(row.amount),
+                
             }
             for row in doc.items
         ],
