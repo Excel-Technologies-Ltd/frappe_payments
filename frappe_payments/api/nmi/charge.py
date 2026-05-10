@@ -145,12 +145,16 @@ def charge(
         billing_addr_name  = None
         shipping_addr_name = None
         if billing_address:
-            billing_addr_name  = _upsert_address(customer, billing_address,  "Billing")
+            billing_addr_name  = _upsert_address(
+                customer, billing_address, "Billing", email, phone
+            )
             shipping_addr_name = billing_addr_name          # default
 
         # Explicit shipping address overrides the default
         if shipping_address:
-            shipping_addr_name = _upsert_address(customer, shipping_address, "Shipping")
+            shipping_addr_name = _upsert_address(
+                customer, shipping_address, "Shipping", email, phone
+            )
 
         # Build invoice in memory to compute grand_total — no DB write yet
         invoice     = _build_invoice(
@@ -350,10 +354,22 @@ def _create_customer(customer_name: str, email: str, phone: str = None) -> str:
 # Address
 # ---------------------------------------------------------------------------
 
-def _upsert_address(customer: str, addr: dict, addr_type: str) -> str:
+def _upsert_address(
+    customer: str,
+    addr: dict,
+    addr_type: str,
+    email: str = None,
+    phone: str = None,
+) -> str:
     """
     Return the Address name for this customer+type, creating it if needed.
-    Reuses an existing record when address_line1 + city already match.
+
+    Reuses an existing record when address_line1 + city already match, but
+    always refreshes its fields with the latest payload — buyers update their
+    contact info (email, phone) or correct their address between orders, so
+    the stored Address must stay in sync with what was just submitted.
+    Operations needs the email/phone on the Address to contact the customer
+    when fulfilling the order.
     """
     address_line1 = addr.get("address_line1", "")
     city          = addr.get("city", "")
@@ -373,29 +389,41 @@ def _upsert_address(customer: str, addr: dict, addr_type: str) -> str:
         """,
         (customer, address_line1, city),
     )
-    if existing:
-        return existing[0][0]
 
-    address_doc = frappe.get_doc({
-        "doctype":            "Address",
-        "address_title":      f"{customer}-{addr_type}",
-        "address_type":       addr_type,
-        "address_line1":      address_line1,
-        "address_line2":      addr.get("address_line2", ""),
-        "city":               city,
-        "state":              addr.get("state", ""),
-        "pincode":            addr.get("pincode", ""),
-        "country":            addr.get("country", "United States"),
-        "is_primary_address": 1 if addr_type == "Billing"  else 0,
-        "is_shipping_address":1 if addr_type == "Shipping" else 0,
-        "links": [{
-            "doctype":      "Dynamic Link",
-            "link_doctype": "Customer",
-            "link_name":    customer,
-        }],
-    })
+    if existing:
+        address_doc = frappe.get_doc("Address", existing[0][0])
+        _apply_address_fields(address_doc, addr, addr_type, email, phone)
+        address_doc.save(ignore_permissions=True)
+        return address_doc.name
+
+    address_doc = frappe.new_doc("Address")
+    address_doc.address_title = f"{customer}-{addr_type}"
+    address_doc.append(
+        "links",
+        {"link_doctype": "Customer", "link_name": customer},
+    )
+    _apply_address_fields(address_doc, addr, addr_type, email, phone)
     address_doc.insert(ignore_permissions=True)
     return address_doc.name
+
+
+def _apply_address_fields(
+    address_doc, addr: dict, addr_type: str, email: str = None, phone: str = None
+) -> None:
+    """Copy the request payload onto an Address document (new or existing)."""
+    address_doc.address_type        = addr_type
+    address_doc.address_line1       = addr.get("address_line1", "")
+    address_doc.address_line2       = addr.get("address_line2", "")
+    address_doc.city                = addr.get("city", "")
+    address_doc.state               = addr.get("state", "")
+    address_doc.pincode             = addr.get("pincode", "")
+    address_doc.country             = addr.get("country", "United States")
+    address_doc.is_primary_address  = 1 if addr_type == "Billing"  else 0
+    address_doc.is_shipping_address = 1 if addr_type == "Shipping" else 0
+    if email:
+        address_doc.email_id = email
+    if phone:
+        address_doc.phone = phone
 
 
 # ---------------------------------------------------------------------------
@@ -557,6 +585,7 @@ def _serialize_invoice(doc) -> dict:
         "customer":               doc.customer,
         "customer_name":          doc.customer_name,
         "status":                 doc.status,
+        "image":                  doc.image,
         "posting_date":           str(doc.posting_date),
         "due_date":               str(doc.due_date),
         "currency":               doc.currency,
