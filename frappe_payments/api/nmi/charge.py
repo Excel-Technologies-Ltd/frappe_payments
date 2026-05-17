@@ -156,6 +156,11 @@ def charge(
                 customer, shipping_address, "Shipping", email, phone
             )
 
+        # Derive state for tax template: prefer billing, fall back to shipping
+        addr_for_state = billing_address or shipping_address
+        state = addr_for_state.get("state") if addr_for_state else None
+        tax_template = _get_tax_template_for_state(state) if state else None
+
         # Build invoice in memory to compute grand_total — no DB write yet
         invoice     = _build_invoice(
             customer=customer,
@@ -164,6 +169,7 @@ def charge(
             billing_address=billing_addr_name,
             shipping_addr_name=shipping_addr_name,
             notes=notes,
+            tax_template=tax_template,
         )
         grand_total = flt(invoice.grand_total)
 
@@ -442,6 +448,12 @@ def _get_default_company() -> str:
     return company
 
 
+def _get_tax_template_for_state(state: str) -> "str | None":
+    """Return '{State} - THB' template name if it exists, else None."""
+    candidate = f"{state.strip()} - THB"
+    return candidate if frappe.db.exists("Sales Taxes and Charges Template", candidate) else None
+
+
 def _build_invoice(
     customer: str,
     company: str,
@@ -449,6 +461,7 @@ def _build_invoice(
     billing_address: str = None,
     shipping_addr_name: str = None,
     notes: str = None,
+    tax_template: str = None,
 ) -> "frappe.model.document.Document":
     """
     Construct a Sales Invoice Document and run ERPNext's standard value-fill
@@ -496,10 +509,13 @@ def _build_invoice(
         doc_data["shipping_address_name"] = shipping_addr_name
     if notes:
         doc_data["terms"] = notes
+    if tax_template:
+        doc_data["taxes_and_charges"] = tax_template
 
     invoice = frappe.get_doc(doc_data)
     # ERPNext fills income accounts, cost centre, currency, exchange rate,
-    # applies pricing rules, and sums up all totals + taxes
+    # applies pricing rules, and sums up all totals + taxes.
+    # set_missing_values() reads taxes_and_charges and populates the tax rows.
     invoice.set_missing_values()
     invoice.calculate_taxes_and_totals()
     return invoice
