@@ -1,0 +1,101 @@
+{
+ "actions": [],
+ "creation": "2026-06-14 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "credentials_section",
+  "api_login_id",
+  "column_break_creds",
+  "transaction_key",
+  "client_key_section",
+  "client_key",
+  "configuration_section",
+  "environment",
+  "column_break_config",
+  "enabled"
+ ],
+ "fields": [
+  {
+   "fieldname": "credentials_section",
+   "fieldtype": "Section Break",
+   "label": "Authorize.net Credentials"
+  },
+  {
+   "description": "API Login ID from your Authorize.net merchant account. Used for server-side authentication.",
+   "fieldname": "api_login_id",
+   "fieldtype": "Password",
+   "label": "API Login ID",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_creds",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Transaction Key from your Authorize.net merchant account. Used for server-side authentication.",
+   "fieldname": "transaction_key",
+   "fieldtype": "Password",
+   "label": "Transaction Key",
+   "reqd": 1
+  },
+  {
+   "fieldname": "client_key_section",
+   "fieldtype": "Section Break",
+   "label": "Accept.js Settings"
+  },
+  {
+   "description": "Public Client Key for Accept.js frontend card tokenization. Obtain from Security → API Credentials in your Authorize.net dashboard.",
+   "fieldname": "client_key",
+   "fieldtype": "Data",
+   "label": "Client Key (Public)"
+  },
+  {
+   "fieldname": "configuration_section",
+   "fieldtype": "Section Break",
+   "label": "Configuration"
+  },
+  {
+   "default": "Sandbox",
+   "description": "Use Sandbox for testing. Switch to Production before going live.",
+   "fieldname": "environment",
+   "fieldtype": "Select",
+   "label": "Environment",
+   "options": "Sandbox\nProduction",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_config",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "description": "Uncheck to disable Authorize.net payment processing sitewide.",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-06-14 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Frappe Payments",
+ "name": "Authorize Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

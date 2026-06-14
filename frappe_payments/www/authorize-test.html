@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Authorize.net Payment Test</title>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f0f4f8;
+      display: flex;
+      justify-content: center;
+      padding: 40px 16px;
+      min-height: 100vh;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      padding: 32px;
+      width: 100%;
+      max-width: 580px;
+    }
+
+    h2 { font-size: 1.3rem; color: #1a202c; margin-bottom: 4px; }
+    .subtitle { font-size: 0.85rem; color: #718096; margin-bottom: 24px; }
+
+    .tabs {
+      display: flex;
+      border-bottom: 2px solid #edf2f7;
+      margin-bottom: 24px;
+    }
+    .tab {
+      padding: 8px 20px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      color: #718096;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .tab.active { color: #667eea; border-bottom-color: #667eea; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .section-title {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #a0aec0;
+      margin: 20px 0 10px;
+      border-bottom: 1px solid #edf2f7;
+      padding-bottom: 4px;
+    }
+
+    .row { display: flex; gap: 12px; }
+    .row .field { flex: 1; }
+    .field { margin-bottom: 14px; }
+
+    label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: #4a5568;
+      margin-bottom: 5px;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 7px;
+      font-size: 0.88rem;
+      color: #2d3748;
+      outline: none;
+      transition: border-color 0.15s;
+      background: #fff;
+    }
+    input:focus, select:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.15); }
+
+    /* Items table */
+    .items-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-bottom: 10px; }
+    .items-table th {
+      text-align: left;
+      font-weight: 500;
+      color: #718096;
+      padding: 4px 6px;
+      border-bottom: 1px solid #edf2f7;
+    }
+    .items-table td { padding: 6px 6px; vertical-align: middle; }
+    .items-table input { padding: 6px 8px; font-size: 0.82rem; }
+    .btn-remove {
+      width: 28px; height: 28px;
+      border: none; border-radius: 50%;
+      background: #fed7d7; color: #c53030;
+      cursor: pointer; font-size: 1rem; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .btn-add {
+      font-size: 0.8rem;
+      color: #667eea;
+      background: none;
+      border: 1px dashed #667eea;
+      border-radius: 6px;
+      padding: 5px 12px;
+      cursor: pointer;
+      width: 100%;
+      margin-bottom: 4px;
+    }
+    .btn-add:hover { background: #ebf4ff; }
+
+    .test-cards {
+      background: #f7fafc;
+      border: 1px dashed #cbd5e0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      font-size: 0.8rem;
+      color: #4a5568;
+      line-height: 1.9;
+    }
+    .test-cards strong { color: #2d3748; display: block; margin-bottom: 2px; }
+    .test-cards code {
+      font-family: monospace;
+      background: #edf2f7;
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+
+    .token-badge {
+      background: #ebf8ff;
+      border: 1px solid #bee3f8;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 0.72rem;
+      color: #2b6cb0;
+      font-family: monospace;
+      word-break: break-all;
+      margin: 10px 0;
+      display: none;
+    }
+
+    button.pay-btn {
+      width: 100%;
+      padding: 13px;
+      background: #667eea;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    button.pay-btn:hover:not(:disabled) { background: #5a67d8; }
+    button.pay-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .status {
+      margin-top: 16px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      display: none;
+      line-height: 1.5;
+    }
+    .status.info    { background: #ebf8ff; color: #2b6cb0; border: 1px solid #bee3f8; display: block; }
+    .status.success { background: #f0fff4; color: #276749; border: 1px solid #9ae6b4; display: block; }
+    .status.error   { background: #fff5f5; color: #c53030; border: 1px solid #feb2b2; display: block; }
+
+    pre {
+      background: #2d3748;
+      color: #e2e8f0;
+      border-radius: 7px;
+      padding: 14px;
+      font-size: 0.75rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin-top: 14px;
+    }
+
+    .config-notice {
+      background: #fffff0;
+      border: 1px solid #faf089;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 0.8rem;
+      color: #744210;
+      margin-bottom: 16px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h2>Authorize.net Payment Test</h2>
+  <p class="subtitle">Sandbox — no real charges</p>
+
+  <div id="config-notice" class="config-notice">
+    ⚠ Could not load Authorize.net public config. Ensure <b>Authorize Settings</b> is saved in the Desk
+    with a valid API Login ID and Client Key, and that you are logged in.
+  </div>
+
+  <div class="test-cards" style="background:#fff5f5;border-color:#feb2b2;color:#742a2a;margin-bottom:16px">
+    <strong>Setup required before testing</strong>
+    In Frappe Desk → <b>Authorize Settings</b>, save your sandbox:<br>
+    • <b>API Login ID</b> — from Authorize.net dashboard<br>
+    • <b>Transaction Key</b> — from Authorize.net dashboard<br>
+    • <b>Client Key</b> — Security → API Credentials → Manage Public Client Key<br>
+    <br>
+    <code>E_WC_02</code> = Authentication failed — API Login ID or Client Key is wrong / not saved.
+  </div>
+
+  <!-- ── Tabs ──────────────────────────────────────────────────────── -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('charge')">One-Time Charge</div>
+    <div class="tab"        onclick="switchTab('subscription')">Recurring Subscription</div>
+  </div>
+
+  <!-- ── Test cards ────────────────────────────────────────────────── -->
+  <div class="test-cards">
+    <strong>Test card numbers (sandbox only)</strong>
+    Visa: <code>4111111111111111</code><br>
+    Mastercard: <code>5424000000000015</code><br>
+    AmEx: <code>370000000000002</code><br>
+    Expiry: <code>12/2029</code> &nbsp;&nbsp; CVV: <code>123</code>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       TAB: ONE-TIME CHARGE
+  ══════════════════════════════════════════════════════════════════ -->
+  <div id="panel-charge" class="tab-panel active">
+
+    <!-- Customer -->
+    <div class="section-title">Customer</div>
+    <div class="row">
+      <div class="field">
+        <label>Full Name</label>
+        <input id="c_customer_name" value="John Doe" />
+      </div>
+      <div class="field">
+        <label>Phone</label>
+        <input id="c_phone" value="+8801700000000" />
+      </div>
+    </div>
+    <div class="field">
+      <label>Email</label>
+      <input id="c_email" type="email" value="excel.azmin@gmail.com" />
+    </div>
+
+    <!-- Items -->
+    <div class="section-title">Order Items</div>
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th style="width:70%">Item Code</th>
+          <th style="width:15%">Qty</th>
+          <th style="width:15%"></th>
+        </tr>
+      </thead>
+      <tbody id="c_items-body">
+        <tr>
+          <td><input class="item-code" value="Truemed Glucosamine Sulfate KCL with Chondroitin and MSM" /></td>
+          <td><input class="item-qty" type="number" value="2" min="1" style="width:60px" /></td>
+          <td><button class="btn-remove" onclick="removeRow(this)">×</button></td>
+        </tr>
+      </tbody>
+    </table>
+    <button class="btn-add" onclick="addRow('c_items-body')">+ Add Item</button>
+
+    <!-- Billing Address -->
+    <div class="section-title">Billing Address</div>
+    <div class="field">
+      <label>Address Line 1</label>
+      <input id="c_bill_addr1" value="14 Main Street" />
+    </div>
+    <div class="row">
+      <div class="field"><label>City</label><input id="c_bill_city" value="Pecan Springs" /></div>
+      <div class="field"><label>State</label><input id="c_bill_state" value="TX" /></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Pincode</label><input id="c_bill_pincode" value="44628" /></div>
+      <div class="field"><label>Country</label><input id="c_bill_country" value="United States" /></div>
+    </div>
+
+    <!-- Shipping Address -->
+    <div class="section-title">Shipping Address</div>
+    <div class="field" style="margin-bottom:8px">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type="checkbox" id="c_same_as_billing" checked onchange="toggleShipping('c')" />
+        Same as billing address
+      </label>
+    </div>
+    <div id="c_shipping-fields" style="display:none">
+      <div class="field"><label>Address Line 1</label><input id="c_ship_addr1" value="14 Main Street" /></div>
+      <div class="row">
+        <div class="field"><label>City</label><input id="c_ship_city" value="Pecan Springs" /></div>
+        <div class="field"><label>State</label><input id="c_ship_state" value="TX" /></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Pincode</label><input id="c_ship_pincode" value="44628" /></div>
+        <div class="field"><label>Country</label><input id="c_ship_country" value="United States" /></div>
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="section-title">Notes</div>
+    <div class="field"><input id="c_notes" value="Please call before delivery" /></div>
+
+    <!-- Card Details (Accept.js) -->
+    <div class="section-title">Card Details</div>
+    <div class="field">
+      <label>Card Number</label>
+      <input id="c_card_number" placeholder="4111111111111111" maxlength="16" />
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Exp Month (MM)</label>
+        <input id="c_exp_month" placeholder="12" maxlength="2" style="width:100%" />
+      </div>
+      <div class="field">
+        <label>Exp Year (YYYY)</label>
+        <input id="c_exp_year" placeholder="2029" maxlength="4" style="width:100%" />
+      </div>
+      <div class="field">
+        <label>CVV</label>
+        <input id="c_cvv" placeholder="123" maxlength="4" style="width:100%" />
+      </div>
+    </div>
+
+    <div id="c_token-badge" class="token-badge"></div>
+
+    <button id="c_pay-btn" class="pay-btn" onclick="initiateCharge()">Pay Now</button>
+    <div id="c_status" class="status"></div>
+    <pre id="c_response-box" style="display:none"></pre>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       TAB: SUBSCRIPTION
+  ══════════════════════════════════════════════════════════════════ -->
+  <div id="panel-subscription" class="tab-panel">
+
+    <!-- Customer -->
+    <div class="section-title">Customer</div>
+    <div class="row">
+      <div class="field">
+        <label>Full Name</label>
+        <input id="s_customer_name" value="Jane Smith" />
+      </div>
+      <div class="field">
+        <label>Phone</label>
+        <input id="s_phone" value="+8801800000000" />
+      </div>
+    </div>
+    <div class="field">
+      <label>Email</label>
+      <input id="s_email" type="email" value="jane@example.com" />
+    </div>
+
+    <!-- Items -->
+    <div class="section-title">Subscription Items</div>
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th style="width:70%">Item Code</th>
+          <th style="width:15%">Qty</th>
+          <th style="width:15%"></th>
+        </tr>
+      </thead>
+      <tbody id="s_items-body">
+        <tr>
+          <td><input class="item-code" value="Truemed Glucosamine Sulfate KCL with Chondroitin and MSM" /></td>
+          <td><input class="item-qty" type="number" value="1" min="1" style="width:60px" /></td>
+          <td><button class="btn-remove" onclick="removeRow(this)">×</button></td>
+        </tr>
+      </tbody>
+    </table>
+    <button class="btn-add" onclick="addRow('s_items-body')">+ Add Item</button>
+
+    <!-- Subscription Settings -->
+    <div class="section-title">Subscription Settings</div>
+    <div class="row">
+      <div class="field">
+        <label>Interval Length</label>
+        <input id="s_interval_length" type="number" value="1" min="1" max="999" />
+      </div>
+      <div class="field">
+        <label>Interval Unit</label>
+        <select id="s_interval_unit">
+          <option value="months" selected>Months</option>
+          <option value="days">Days</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Start Date</label>
+        <input id="s_start_date" type="date" />
+      </div>
+      <div class="field">
+        <label>Total Occurrences (9999 = unlimited)</label>
+        <input id="s_total_occurrences" type="number" value="9999" min="1" />
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Trial Occurrences</label>
+        <input id="s_trial_occurrences" type="number" value="0" min="0" />
+      </div>
+      <div class="field">
+        <label>Trial Amount</label>
+        <input id="s_trial_amount" type="number" value="0.00" min="0" step="0.01" />
+      </div>
+    </div>
+    <div class="field">
+      <label>Subscription Name (optional)</label>
+      <input id="s_sub_name" placeholder="Monthly Plan" />
+    </div>
+
+    <!-- Billing Address -->
+    <div class="section-title">Billing Address</div>
+    <div class="field"><label>Address Line 1</label><input id="s_bill_addr1" value="14 Main Street" /></div>
+    <div class="row">
+      <div class="field"><label>City</label><input id="s_bill_city" value="Pecan Springs" /></div>
+      <div class="field"><label>State</label><input id="s_bill_state" value="TX" /></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Pincode</label><input id="s_bill_pincode" value="44628" /></div>
+      <div class="field"><label>Country</label><input id="s_bill_country" value="United States" /></div>
+    </div>
+
+    <!-- Notes -->
+    <div class="section-title">Notes</div>
+    <div class="field"><input id="s_notes" value="Monthly subscription" /></div>
+
+    <!-- Card Details (Accept.js) -->
+    <div class="section-title">Card Details</div>
+    <div class="field">
+      <label>Card Number</label>
+      <input id="s_card_number" placeholder="4111111111111111" maxlength="16" />
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Exp Month (MM)</label>
+        <input id="s_exp_month" placeholder="12" maxlength="2" />
+      </div>
+      <div class="field">
+        <label>Exp Year (YYYY)</label>
+        <input id="s_exp_year" placeholder="2029" maxlength="4" />
+      </div>
+      <div class="field">
+        <label>CVV</label>
+        <input id="s_cvv" placeholder="123" maxlength="4" />
+      </div>
+    </div>
+
+    <div id="s_token-badge" class="token-badge"></div>
+
+    <button id="s_pay-btn" class="pay-btn" onclick="initiateSubscription()">Create Subscription</button>
+    <div id="s_status" class="status"></div>
+    <pre id="s_response-box" style="display:none"></pre>
+  </div>
+</div>
+
+<script>
+  const API_BASE          = window.location.origin;
+  const IS_HTTPS          = window.location.protocol === "https:";
+
+  // HTTP → sandbox direct-card endpoints (no Accept.js needed)
+  // HTTPS → opaque-data endpoints via Accept.js tokenisation
+  const CHARGE_URL        = IS_HTTPS
+    ? `${API_BASE}/api/method/frappe_payments.api.authorize.charge.charge`
+    : `${API_BASE}/api/method/frappe_payments.api.authorize.charge.charge_sandbox`;
+  const SUBSCRIBE_URL     = IS_HTTPS
+    ? `${API_BASE}/api/method/frappe_payments.api.authorize.subscription.create_subscription`
+    : `${API_BASE}/api/method/frappe_payments.api.authorize.subscription.create_subscription_sandbox`;
+  const CONFIG_URL        = `${API_BASE}/api/method/frappe_payments.api.authorize.charge.get_public_config`;
+
+  let acceptJsLoaded = false;
+  let publicConfig   = null;
+
+  // ── Set today as default start date ──────────────────────────────────────
+  document.getElementById("s_start_date").valueAsDate = new Date();
+
+  // ── Tab switching ─────────────────────────────────────────────────────────
+  function switchTab(name) {
+    document.querySelectorAll(".tab").forEach((t, i) => {
+      t.classList.toggle("active", ["charge","subscription"][i] === name);
+    });
+    document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+    document.getElementById(`panel-${name}`).classList.add("active");
+  }
+
+  // ── Shipping toggle ───────────────────────────────────────────────────────
+  function toggleShipping(prefix) {
+    const same = document.getElementById(`${prefix}_same_as_billing`).checked;
+    document.getElementById(`${prefix}_shipping-fields`).style.display = same ? "none" : "block";
+  }
+
+  // ── Items table ───────────────────────────────────────────────────────────
+  function addRow(tbodyId) {
+    const tbody = document.getElementById(tbodyId);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><input class="item-code" placeholder="Item Code" /></td>
+      <td><input class="item-qty" type="number" value="1" min="1" style="width:60px" /></td>
+      <td><button class="btn-remove" onclick="removeRow(this)">×</button></td>`;
+    tbody.appendChild(tr);
+  }
+
+  function removeRow(btn) {
+    const rows = btn.closest("tbody").querySelectorAll("tr");
+    if (rows.length > 1) btn.closest("tr").remove();
+  }
+
+  function getItems(tbodyId) {
+    return Array.from(document.querySelectorAll(`#${tbodyId} tr`)).map(tr => ({
+      item_code: tr.querySelector(".item-code").value.trim(),
+      qty: parseInt(tr.querySelector(".item-qty").value, 10) || 1,
+    })).filter(r => r.item_code);
+  }
+
+  // ── CSRF ──────────────────────────────────────────────────────────────────
+  function getCsrfToken() {
+    const m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+    return m ? decodeURIComponent(m[1]) : "";
+  }
+
+  async function ensureCsrfToken() {
+    if (getCsrfToken()) return getCsrfToken();
+    try { await fetch(`${API_BASE}/api/method/frappe.ping`, { credentials: "include" }); } catch (_) {}
+    return getCsrfToken();
+  }
+
+  // ── Load Authorize.net config + Accept.js (HTTPS only) ───────────────────
+  async function loadConfig() {
+    try {
+      const csrfToken = await ensureCsrfToken();
+      const resp = await fetch(CONFIG_URL, { credentials: "include", headers: { "X-Frappe-CSRF-Token": csrfToken } });
+      const data = await resp.json();
+      publicConfig = data.message || data;
+
+      const isProduction = (publicConfig.environment || "Sandbox") === "Production";
+
+      if (!IS_HTTPS && isProduction) {
+        // Production + HTTP is unsupported — direct card is sandbox-only, Accept.js needs HTTPS
+        const banner = document.createElement("div");
+        banner.style.cssText = "background:#fff5f5;border:2px solid #fc8181;border-radius:8px;padding:14px 16px;font-size:0.85rem;color:#742a2a;margin-bottom:16px";
+        banner.innerHTML =
+          "<b>⛔ Production + HTTP is not supported.</b><br><br>" +
+          "Direct card entry (<code>charge_sandbox</code>) is blocked in Production for security.<br>" +
+          "To test on this machine, choose one of:<br><br>" +
+          "• <b>Switch to Sandbox</b> in Frappe Desk → Authorize Settings → Environment<br>" +
+          "• <b>Use HTTPS</b> — Accept.js tokenizes the card server-side and works with Production";
+        document.querySelector(".card").insertBefore(banner, document.querySelector(".tabs"));
+
+        // Disable both buttons so nothing can be submitted
+        document.getElementById("c_pay-btn").disabled = true;
+        document.getElementById("s_pay-btn").disabled = true;
+        document.getElementById("c_pay-btn").title = "Production + HTTP not supported";
+        document.getElementById("s_pay-btn").title = "Production + HTTP not supported";
+
+        // Hide test cards hint (irrelevant in production)
+        document.querySelectorAll(".test-cards").forEach(el => {
+          if (el.textContent.includes("Test card numbers")) el.style.display = "none";
+        });
+        return;
+      }
+
+      if (!IS_HTTPS) {
+        // HTTP + Sandbox — direct card mode
+        const banner = document.createElement("div");
+        banner.style.cssText = "background:#fefcbf;border:1px solid #f6e05e;border-radius:8px;padding:10px 14px;font-size:0.8rem;color:#744210;margin-bottom:16px";
+        banner.innerHTML = "⚡ <b>HTTP detected — Sandbox direct-card mode.</b> Card data goes straight to Authorize.net sandbox without Accept.js. Fine for local dev; production uses HTTPS + Accept.js automatically.";
+        document.querySelector(".card").insertBefore(banner, document.querySelector(".tabs"));
+        return; // no Accept.js needed over HTTP
+      }
+
+      // HTTPS path — load Accept.js
+      if (!publicConfig.api_login_id || !publicConfig.client_key) {
+        document.getElementById("config-notice").style.display = "block";
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.src = isProduction
+        ? "https://js.authorize.net/v1/Accept.js"
+        : "https://jstest.authorize.net/v1/Accept.js";
+      script.charset = "utf-8";
+      script.onload = () => { acceptJsLoaded = true; };
+      document.head.appendChild(script);
+    } catch (err) {
+      if (IS_HTTPS) document.getElementById("config-notice").style.display = "block";
+      console.error("Failed to load Authorize.net config:", err);
+    }
+  }
+
+  loadConfig();
+
+  // ── Accept.js tokenisation (HTTPS path only) ─────────────────────────────
+  function tokenizeCard(prefix) {
+    return new Promise((resolve, reject) => {
+      if (!acceptJsLoaded || !publicConfig) {
+        reject(new Error("Accept.js not loaded yet. Please wait a moment and try again."));
+        return;
+      }
+      const authData = { clientKey: publicConfig.client_key, apiLoginID: publicConfig.api_login_id };
+      const cardData = {
+        cardNumber: document.getElementById(`${prefix}_card_number`).value.replace(/\s/g, ""),
+        month:      document.getElementById(`${prefix}_exp_month`).value.padStart(2, "0"),
+        year:       document.getElementById(`${prefix}_exp_year`).value,
+        cardCode:   document.getElementById(`${prefix}_cvv`).value,
+      };
+      if (!cardData.cardNumber || !cardData.month || !cardData.year) {
+        reject(new Error("Card number, expiry month, and expiry year are required."));
+        return;
+      }
+      Accept.dispatchData({ authData, cardData }, (response) => {
+        if (response.messages.resultCode === "Error") {
+          const errs = response.messages.message.map(m => `${m.code}: ${m.text || m.description || ""}`).join("; ");
+          reject(new Error(errs));
+          return;
+        }
+        resolve(response.opaqueData);
+      });
+    });
+  }
+
+  // ── Read raw card data from form (HTTP sandbox path) ─────────────────────
+  function getRawCard(prefix) {
+    const num   = document.getElementById(`${prefix}_card_number`).value.replace(/\s/g, "");
+    const month = document.getElementById(`${prefix}_exp_month`).value.trim();
+    const year  = document.getElementById(`${prefix}_exp_year`).value.trim();
+    const cvv   = document.getElementById(`${prefix}_cvv`).value.trim();
+    if (!num || !month || !year) throw new Error("Card number, expiry month, and expiry year are required.");
+    return { card_number: num, expiration_month: month, expiration_year: year, card_code: cvv };
+  }
+
+  // ── One-time charge ───────────────────────────────────────────────────────
+  async function initiateCharge() {
+    const btn   = document.getElementById("c_pay-btn");
+    const items = getItems("c_items-body");
+    if (!items.length) { showStatus("c", "error", "Add at least one item before paying."); return; }
+    clearStatus("c");
+    btn.disabled = true;
+
+    if (IS_HTTPS) {
+      btn.textContent = "Tokenizing card…";
+      let opaqueData;
+      try {
+        opaqueData = await tokenizeCard("c");
+      } catch (err) {
+        showStatus("c", "error", err.message);
+        btn.disabled = false; btn.textContent = "Pay Now"; return;
+      }
+      const badge = document.getElementById("c_token-badge");
+      badge.textContent = `dataDescriptor: ${opaqueData.dataDescriptor}\ndataValue: ${opaqueData.dataValue.slice(0,40)}…`;
+      badge.style.display = "block";
+      btn.textContent = "Charging…";
+      await submitCharge({ mode: "opaque", opaqueData }, items);
+    } else {
+      btn.textContent = "Charging…";
+      let card;
+      try { card = getRawCard("c"); } catch (err) {
+        showStatus("c", "error", err.message);
+        btn.disabled = false; btn.textContent = "Pay Now"; return;
+      }
+      await submitCharge({ mode: "card", card }, items);
+    }
+
+    btn.disabled = false; btn.textContent = "Pay Now";
+  }
+
+  async function submitCharge(paymentData, items) {
+    showStatus("c", "info", "Charging card and creating invoice…");
+    const csrfToken    = await ensureCsrfToken();
+    const sameAddr     = document.getElementById("c_same_as_billing").checked;
+    const billingAddress = {
+      address_line1: document.getElementById("c_bill_addr1").value.trim(),
+      city:          document.getElementById("c_bill_city").value.trim(),
+      state:         document.getElementById("c_bill_state").value.trim(),
+      pincode:       document.getElementById("c_bill_pincode").value.trim(),
+      country:       document.getElementById("c_bill_country").value.trim(),
+    };
+    const shippingAddress = sameAddr ? billingAddress : {
+      address_line1: document.getElementById("c_ship_addr1").value.trim(),
+      city:          document.getElementById("c_ship_city").value.trim(),
+      state:         document.getElementById("c_ship_state").value.trim(),
+      pincode:       document.getElementById("c_ship_pincode").value.trim(),
+      country:       document.getElementById("c_ship_country").value.trim(),
+    };
+
+    const baseBody = {
+      customer_name:    document.getElementById("c_customer_name").value.trim(),
+      email:            document.getElementById("c_email").value.trim(),
+      phone:            document.getElementById("c_phone").value.trim(),
+      items:            JSON.stringify(items),
+      billing_address:  JSON.stringify(billingAddress),
+      shipping_address: JSON.stringify(shippingAddress),
+      notes:            document.getElementById("c_notes").value.trim(),
+    };
+
+    const body = paymentData.mode === "opaque"
+      ? { ...baseBody, opaque_data_descriptor: paymentData.opaqueData.dataDescriptor, opaque_data_value: paymentData.opaqueData.dataValue }
+      : { ...baseBody, ...paymentData.card };
+
+    try {
+      const resp = await fetch(CHARGE_URL, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", "X-Frappe-CSRF-Token": csrfToken },
+        body: new URLSearchParams(body),
+      });
+      const data = await resp.json();
+      if (data.message?.success) {
+        const d = data.message.data;
+        showStatus("c", "success",
+          `✓ Payment approved!\n` +
+          `Transaction ID : ${d.transaction_id}\n` +
+          `Invoice        : ${d.invoice.name}\n` +
+          `Payment Entry  : ${d.payment_entry}\n` +
+          `Grand Total    : ${d.invoice.currency} ${d.invoice.grand_total}`);
+      } else {
+        const err = data.error_data || data;
+        showStatus("c", "error", `Error ${err.error_code || ""}: ${err.message || JSON.stringify(err)}`);
+      }
+      showResponse("c", data);
+    } catch (err) { showStatus("c", "error", `Network error: ${err.message}`); }
+  }
+
+  // ── Subscription ──────────────────────────────────────────────────────────
+  async function initiateSubscription() {
+    const btn   = document.getElementById("s_pay-btn");
+    const items = getItems("s_items-body");
+    if (!items.length) { showStatus("s", "error", "Add at least one item."); return; }
+    clearStatus("s");
+    btn.disabled = true;
+
+    if (IS_HTTPS) {
+      btn.textContent = "Tokenizing card…";
+      let opaqueData;
+      try {
+        opaqueData = await tokenizeCard("s");
+      } catch (err) {
+        showStatus("s", "error", err.message);
+        btn.disabled = false; btn.textContent = "Create Subscription"; return;
+      }
+      const badge = document.getElementById("s_token-badge");
+      badge.textContent = `dataDescriptor: ${opaqueData.dataDescriptor}\ndataValue: ${opaqueData.dataValue.slice(0,40)}…`;
+      badge.style.display = "block";
+      btn.textContent = "Creating subscription…";
+      await submitSubscription({ mode: "opaque", opaqueData }, items);
+    } else {
+      btn.textContent = "Creating subscription…";
+      let card;
+      try { card = getRawCard("s"); } catch (err) {
+        showStatus("s", "error", err.message);
+        btn.disabled = false; btn.textContent = "Create Subscription"; return;
+      }
+      await submitSubscription({ mode: "card", card }, items);
+    }
+
+    btn.disabled = false; btn.textContent = "Create Subscription";
+  }
+
+  async function submitSubscription(paymentData, items) {
+    showStatus("s", "info", "Creating subscription and recording invoice…");
+    const csrfToken = await ensureCsrfToken();
+    const billingAddress = {
+      address_line1: document.getElementById("s_bill_addr1").value.trim(),
+      city:          document.getElementById("s_bill_city").value.trim(),
+      state:         document.getElementById("s_bill_state").value.trim(),
+      pincode:       document.getElementById("s_bill_pincode").value.trim(),
+      country:       document.getElementById("s_bill_country").value.trim(),
+    };
+
+    const baseBody = {
+      customer_name:     document.getElementById("s_customer_name").value.trim(),
+      email:             document.getElementById("s_email").value.trim(),
+      phone:             document.getElementById("s_phone").value.trim(),
+      items:             JSON.stringify(items),
+      interval_length:   document.getElementById("s_interval_length").value,
+      interval_unit:     document.getElementById("s_interval_unit").value,
+      start_date:        document.getElementById("s_start_date").value,
+      total_occurrences: document.getElementById("s_total_occurrences").value,
+      trial_occurrences: document.getElementById("s_trial_occurrences").value,
+      trial_amount:      document.getElementById("s_trial_amount").value,
+      subscription_name: document.getElementById("s_sub_name").value.trim(),
+      billing_address:   JSON.stringify(billingAddress),
+      notes:             document.getElementById("s_notes").value.trim(),
+    };
+
+    const body = paymentData.mode === "opaque"
+      ? { ...baseBody, opaque_data_descriptor: paymentData.opaqueData.dataDescriptor, opaque_data_value: paymentData.opaqueData.dataValue }
+      : { ...baseBody, ...paymentData.card };
+
+    try {
+      const resp = await fetch(SUBSCRIBE_URL, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", "X-Frappe-CSRF-Token": csrfToken },
+        body: new URLSearchParams(body),
+      });
+      const data = await resp.json();
+      if (data.message?.success) {
+        const d = data.message.data;
+        showStatus("s", "success",
+          `✓ Subscription created!\n` +
+          `Subscription ID : ${d.subscription_id}\n` +
+          `Invoice         : ${d.invoice.name}\n` +
+          `Payment Entry   : ${d.payment_entry}\n` +
+          `Amount          : ${d.invoice.currency} ${d.invoice.grand_total}\n` +
+          `Billing Every   : ${d.interval_length} ${d.interval_unit}\n` +
+          `Start Date      : ${d.start_date}`);
+      } else {
+        const err = data.error_data || data;
+        showStatus("s", "error", `Error ${err.error_code || ""}: ${err.message || JSON.stringify(err)}`);
+      }
+      showResponse("s", data);
+    } catch (err) { showStatus("s", "error", `Network error: ${err.message}`); }
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function showStatus(prefix, type, msg) {
+    const el = document.getElementById(`${prefix}_status`);
+    el.className = `status ${type}`;
+    el.style.whiteSpace = "pre-line";
+    el.textContent = msg;
+  }
+
+  function clearStatus(prefix) {
+    const el = document.getElementById(`${prefix}_status`);
+    el.className = "status";
+    el.textContent = "";
+    document.getElementById(`${prefix}_response-box`).style.display = "none";
+    document.getElementById(`${prefix}_token-badge`).style.display  = "none";
+  }
+
+  function showResponse(prefix, data) {
+    const box = document.getElementById(`${prefix}_response-box`);
+    box.style.display = "block";
+    box.textContent = JSON.stringify(data, null, 2);
+  }
+</script>
+</body>
+</html>

@@ -119,6 +119,9 @@ doc_events = {
     "NMI Settings": {
         "on_update": "frappe_payments.utils.payment_settings.invalidate_settings_cache",
     },
+    "Authorize Settings": {
+        "on_update": "frappe_payments.utils.payment_settings.invalidate_authorize_settings_cache",
+    },
 }
 
 # Scheduled Tasks
