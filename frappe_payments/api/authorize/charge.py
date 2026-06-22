@@ -132,6 +132,12 @@ def charge(
     finally:
         frappe.set_user(_original_user)
 
+    if not grand_total:
+        frappe.throw(
+            "Order total is zero. Ensure items have a price list rate or pass a rate explicitly.",
+            frappe.ValidationError,
+        )
+
     # --- Charge the card via Authorize.net ----------------------------------
     transaction = authorize_client.charge(
         amount=grand_total,
@@ -266,6 +272,12 @@ def charge_sandbox(
         grand_total = flt(invoice.grand_total)
     finally:
         frappe.set_user(_original_user)
+
+    if not grand_total:
+        frappe.throw(
+            "Order total is zero. Ensure items have a price list rate or pass a rate explicitly.",
+            frappe.ValidationError,
+        )
 
     transaction = authorize_client.charge_with_card(
         amount=grand_total,
