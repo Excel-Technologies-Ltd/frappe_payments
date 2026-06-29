@@ -30,6 +30,7 @@ from frappe.utils import flt, nowdate
 
 from frappe_payments.utils.error_handler import ErrorCode, throw_payment_error, success_response
 from frappe_payments.utils import authorize_client
+from frappe_payments.utils.coupon import apply_coupon_to_invoice
 
 
 @frappe.whitelist(allow_guest=True)
@@ -43,6 +44,7 @@ def charge(
     billing_address: "dict | str" = None,
     shipping_address: "dict | str" = None,
     notes: str = None,
+    coupon_code: str = None,
 ) -> dict:
     """
     Charge a card via Authorize.net and create all ERPNext documents in one call.
@@ -127,6 +129,7 @@ def charge(
             notes=notes,
             tax_template=tax_template,
         )
+        discount_info = apply_coupon_to_invoice(invoice, coupon_code, customer) if coupon_code else None
         grand_total = flt(invoice.grand_total)
 
     finally:
@@ -160,7 +163,6 @@ def charge(
         payment_entry_name = _create_payment_entry(
             invoice=invoice,
             transaction_id=transaction["transaction_id"],
-            amount=grand_total,
         )
 
     except Exception as exc:
@@ -184,14 +186,14 @@ def charge(
     finally:
         frappe.set_user(_original_user)
 
-    return success_response(
-        message=_("Payment successful"),
-        data={
-            "transaction_id": transaction["transaction_id"],
-            "invoice":        _serialize_invoice(invoice),
-            "payment_entry":  payment_entry_name,
-        },
-    )
+    resp_data = {
+        "transaction_id": transaction["transaction_id"],
+        "invoice":        _serialize_invoice(invoice),
+        "payment_entry":  payment_entry_name,
+    }
+    if discount_info:
+        resp_data["coupon"] = discount_info
+    return success_response(message=_("Payment successful"), data=resp_data)
 
 
 @frappe.whitelist(allow_guest=True)
@@ -207,6 +209,7 @@ def charge_sandbox(
     billing_address: "dict | str" = None,
     shipping_address: "dict | str" = None,
     notes: str = None,
+    coupon_code: str = None,
 ) -> dict:
     """
     SANDBOX ONLY — one-time charge with raw card data, bypassing Accept.js.
@@ -269,6 +272,7 @@ def charge_sandbox(
             notes=notes,
             tax_template=tax_template,
         )
+        discount_info = apply_coupon_to_invoice(invoice, coupon_code, customer) if coupon_code else None
         grand_total = flt(invoice.grand_total)
     finally:
         frappe.set_user(_original_user)
@@ -297,7 +301,6 @@ def charge_sandbox(
         payment_entry_name = _create_payment_entry(
             invoice=invoice,
             transaction_id=transaction["transaction_id"],
-            amount=grand_total,
         )
     except Exception as exc:
         frappe.log_error(
@@ -319,14 +322,14 @@ def charge_sandbox(
     finally:
         frappe.set_user(_original_user)
 
-    return success_response(
-        message=_("Payment successful"),
-        data={
-            "transaction_id": transaction["transaction_id"],
-            "invoice":        _serialize_invoice(invoice),
-            "payment_entry":  payment_entry_name,
-        },
-    )
+    resp_data = {
+        "transaction_id": transaction["transaction_id"],
+        "invoice":        _serialize_invoice(invoice),
+        "payment_entry":  payment_entry_name,
+    }
+    if discount_info:
+        resp_data["coupon"] = discount_info
+    return success_response(message=_("Payment successful"), data=resp_data)
 
 
 @frappe.whitelist(allow_guest=True)
@@ -617,13 +620,16 @@ def _build_invoice(
 def _create_payment_entry(
     invoice: "frappe.model.document.Document",
     transaction_id: str,
-    amount: float,
 ) -> str:
     from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
 
     _ensure_authorize_mode_of_payment()
 
-    pe = get_payment_entry("Sales Invoice", invoice.name, party_amount=amount)
+    # Read outstanding_amount from DB after submit — avoids floating-point
+    # mismatch between the in-memory grand_total and what ERPNext stored.
+    outstanding = flt(frappe.db.get_value("Sales Invoice", invoice.name, "outstanding_amount"))
+
+    pe = get_payment_entry("Sales Invoice", invoice.name, party_amount=outstanding)
     pe.mode_of_payment = "Authorize.net"
     pe.reference_no    = transaction_id
     pe.reference_date  = nowdate()

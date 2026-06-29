@@ -316,6 +316,21 @@
     <div class="section-title">Notes</div>
     <div class="field"><input id="c_notes" value="Please call before delivery" /></div>
 
+    <!-- Coupon Code -->
+    <div class="section-title">Discount / Coupon</div>
+    <div class="row" style="align-items:flex-end">
+      <div class="field">
+        <label>Coupon Code <span style="font-weight:400;color:#a0aec0">(optional)</span></label>
+        <input id="c_coupon_code" placeholder="e.g. SAVE10" style="text-transform:uppercase" />
+      </div>
+      <div class="field" style="flex:0 0 auto">
+        <button onclick="verifyCoupon('c')" style="padding:9px 16px;background:#edf2f7;border:1px solid #e2e8f0;border-radius:7px;font-size:0.85rem;cursor:pointer;color:#4a5568;white-space:nowrap">
+          Verify
+        </button>
+      </div>
+    </div>
+    <div id="c_coupon-status" style="display:none;margin-bottom:10px;padding:8px 12px;border-radius:7px;font-size:0.82rem"></div>
+
     <!-- Card Details (Accept.js) -->
     <div class="section-title">Card Details</div>
     <div class="field">
@@ -707,6 +722,7 @@
       country:       document.getElementById("c_ship_country").value.trim(),
     };
 
+    const coupon = document.getElementById("c_coupon_code").value.trim().toUpperCase();
     const baseBody = {
       customer_name:    document.getElementById("c_customer_name").value.trim(),
       email:            document.getElementById("c_email").value.trim(),
@@ -715,6 +731,7 @@
       billing_address:  JSON.stringify(billingAddress),
       shipping_address: JSON.stringify(shippingAddress),
       notes:            document.getElementById("c_notes").value.trim(),
+      ...(coupon && { coupon_code: coupon }),
     };
 
     const body = paymentData.mode === "opaque"
@@ -730,12 +747,19 @@
       const data = await resp.json();
       if (data.message?.success) {
         const d = data.message.data;
-        showStatus("c", "success",
-          `✓ Payment approved!\n` +
+        let msg = `✓ Payment approved!\n` +
           `Transaction ID : ${d.transaction_id}\n` +
           `Invoice        : ${d.invoice.name}\n` +
           `Payment Entry  : ${d.payment_entry}\n` +
-          `Grand Total    : ${d.invoice.currency} ${d.invoice.grand_total}`);
+          `Grand Total    : ${d.invoice.currency} ${d.invoice.grand_total}`;
+        if (d.coupon) {
+          const c = d.coupon;
+          const disc = c.discount_percentage != null
+            ? `${c.discount_percentage}% off`
+            : c.discount_amount != null ? `${c.discount_amount} off` : "applied";
+          msg += `\nCoupon         : ${c.coupon_code} (${disc})`;
+        }
+        showStatus("c", "success", msg);
       } else {
         const err = data.error_data || data;
         showStatus("c", "error", `Error ${err.error_code || ""}: ${err.message || JSON.stringify(err)}`);
@@ -833,6 +857,46 @@
       }
       showResponse("s", data);
     } catch (err) { showStatus("s", "error", `Network error: ${err.message}`); }
+  }
+
+  // ── Coupon verify ─────────────────────────────────────────────────────────
+  const VERIFY_URL = `${API_BASE}/api/method/true_med.api.coupon_code.veriy.verify_coupon_code`;
+
+  async function verifyCoupon(prefix) {
+    const code = document.getElementById(`${prefix}_coupon_code`).value.trim().toUpperCase();
+    const el   = document.getElementById(`${prefix}_coupon-status`);
+    if (!code) { el.style.display = "none"; return; }
+
+    el.style.cssText = "display:block;padding:8px 12px;border-radius:7px;font-size:0.82rem;background:#ebf8ff;color:#2b6cb0;border:1px solid #bee3f8";
+    el.textContent = "Verifying…";
+
+    try {
+      const csrfToken = await ensureCsrfToken();
+      const resp = await fetch(`${VERIFY_URL}?coupon_code=${encodeURIComponent(code)}`, {
+        credentials: "include",
+        headers: { "X-Frappe-CSRF-Token": csrfToken },
+      });
+      const data = await resp.json();
+      const result = data.message || data;
+
+      if (result.valid) {
+        const d = result.discount;
+        let discText = "No discount rule linked";
+        if (d) {
+          if (d.discount_percentage) discText = `${d.discount_percentage}% off (${d.apply_discount_on || "Grand Total"})`;
+          else if (d.discount_amount) discText = `${d.discount_amount} off (${d.apply_discount_on || "Grand Total"})`;
+          else if (d.free_item)       discText = `Free item: ${d.free_item} × ${d.free_qty}`;
+        }
+        el.style.cssText = "display:block;padding:8px 12px;border-radius:7px;font-size:0.82rem;background:#f0fff4;color:#276749;border:1px solid #9ae6b4";
+        el.textContent = `✓ Valid coupon — ${discText}`;
+      } else {
+        el.style.cssText = "display:block;padding:8px 12px;border-radius:7px;font-size:0.82rem;background:#fff5f5;color:#c53030;border:1px solid #feb2b2";
+        el.textContent = `✗ ${result.message}`;
+      }
+    } catch (err) {
+      el.style.cssText = "display:block;padding:8px 12px;border-radius:7px;font-size:0.82rem;background:#fff5f5;color:#c53030;border:1px solid #feb2b2";
+      el.textContent = `Error: ${err.message}`;
+    }
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
