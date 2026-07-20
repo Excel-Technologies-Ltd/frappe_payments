@@ -152,7 +152,7 @@ def create_subscription(
 
         addr_for_state = billing_address or shipping_address
         state = addr_for_state.get("state") if addr_for_state else None
-        tax_template = _get_tax_template_for_state(state) if state else None
+        tax_template = _get_tax_template_for_state(state, company) if state else None
 
         invoice     = _build_invoice(
             customer=customer,
@@ -327,7 +327,7 @@ def create_subscription_sandbox(
 
         addr_for_state = billing_address or shipping_address
         state = addr_for_state.get("state") if addr_for_state else None
-        tax_template = _get_tax_template_for_state(state) if state else None
+        tax_template = _get_tax_template_for_state(state, company) if state else None
 
         invoice     = _build_invoice(
             customer=customer,

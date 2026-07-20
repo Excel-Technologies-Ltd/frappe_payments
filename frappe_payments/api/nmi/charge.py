@@ -161,7 +161,7 @@ def charge(
         # Derive state for tax template: prefer billing, fall back to shipping
         addr_for_state = billing_address or shipping_address
         state = addr_for_state.get("state") if addr_for_state else None
-        tax_template = _get_tax_template_for_state(state) if state else None
+        tax_template = _get_tax_template_for_state(state, company) if state else None
 
         # Build invoice in memory to compute grand_total — no DB write yet
         invoice     = _build_invoice(
@@ -450,10 +450,15 @@ def _get_default_company() -> str:
     return company
 
 
-def _get_tax_template_for_state(state: str) -> "str | None":
-    """Return '{State} - THB' template name if it exists, else None."""
-    candidate = f"{state.strip()} - THB"
-    return candidate if frappe.db.exists("Sales Taxes and Charges Template", candidate) else None
+def _get_tax_template_for_state(state: str, company: str) -> "str | None":
+    """Look up a Sales Taxes and Charges Template by its Title (state name) and
+    Company, rather than guessing the autoname pattern '{title} - {company abbr}'.
+    """
+    return frappe.db.get_value(
+        "Sales Taxes and Charges Template",
+        {"title": state.strip(), "company": company, "disabled": 0},
+        "name",
+    )
 
 
 def _build_invoice(
