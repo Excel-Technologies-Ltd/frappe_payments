@@ -65,7 +65,7 @@ def charge(
                                          Optional "rate" key overrides price list.
         payment_token    str  required   One-time token from Collect.js (frontend)
         phone            str  optional   Contact phone number
-        billing_address  dict optional   {
+        billing_address  dict required   {
                                            "address_line1": "123 Gulshan Ave",
                                            "address_line2": "",          (optional)
                                            "city":          "Dhaka",
@@ -73,8 +73,8 @@ def charge(
                                            "pincode":       "1212",
                                            "country":       "Bangladesh"
                                          }
-        shipping_address dict optional   Same shape as billing_address.
-                                         Defaults to billing_address when omitted.
+        shipping_address dict required   Same shape as billing_address; its
+                                         state determines the tax template.
         notes            str  optional   Order notes / delivery instructions.
 
     Example request:
@@ -126,11 +126,14 @@ def charge(
     """
     # --- Deserialise JSON strings sent over HTTP form-data ------------------
     items            = _parse_json(items, "items")
-    billing_address  = _parse_json(billing_address,  "billing_address")  if billing_address  else None
-    shipping_address = _parse_json(shipping_address, "shipping_address") if shipping_address else None
+    # Both addresses are mandatory; validated below so callers get a clear error
+    billing_address  = _parse_json(billing_address,  "billing_address")
+    shipping_address = _parse_json(shipping_address, "shipping_address")
 
     # --- Basic validation (payment token, email format, items list shape) ---
     _validate_basic(customer_name, email, payment_token, items)
+    _validate_address(billing_address,  "billing_address")
+    _validate_address(shipping_address, "shipping_address")
 
     # --- ERPNext operations under Administrator (permission bypass) ----------
     _original_user = frappe.session.user
@@ -143,25 +146,15 @@ def charge(
         customer = _get_or_create_customer(customer_name, email, phone)
         company  = _get_default_company()
 
-        # Billing address → also used as default shipping when not provided
-        billing_addr_name  = None
-        shipping_addr_name = None
-        if billing_address:
-            billing_addr_name  = _upsert_address(
-                customer, billing_address, "Billing", email, phone
-            )
-            shipping_addr_name = billing_addr_name          # default
+        billing_addr_name  = _upsert_address(
+            customer, billing_address, "Billing", email, phone
+        )
+        shipping_addr_name = _upsert_address(
+            customer, shipping_address, "Shipping", email, phone
+        )
 
-        # Explicit shipping address overrides the default
-        if shipping_address:
-            shipping_addr_name = _upsert_address(
-                customer, shipping_address, "Shipping", email, phone
-            )
-
-        # Derive state for tax template: prefer billing, fall back to shipping
-        addr_for_state = billing_address or shipping_address
-        state = addr_for_state.get("state") if addr_for_state else None
-        tax_template = _get_tax_template_for_state(state, company) if state else None
+        # Tax is determined by where the goods are delivered (shipping state)
+        tax_template = _get_tax_template_for_state(shipping_address["state"], company)
 
         # Build invoice in memory to compute grand_total — no DB write yet
         invoice     = _build_invoice(
@@ -259,6 +252,21 @@ def _validate_basic(customer_name: str, email: str, payment_token: str, items: l
             frappe.throw(
                 _("Row {0}: qty must be greater than 0").format(idx), frappe.ValidationError
             )
+
+
+REQUIRED_ADDRESS_FIELDS = ("address_line1", "city", "state", "country")
+
+
+def _validate_address(addr, field_name: str):
+    if not addr or not isinstance(addr, dict):
+        frappe.throw(_("{0} is required").format(field_name), frappe.MandatoryError)
+
+    missing = [f for f in REQUIRED_ADDRESS_FIELDS if not str(addr.get(f) or "").strip()]
+    if missing:
+        frappe.throw(
+            _("{0}: missing required field(s): {1}").format(field_name, ", ".join(missing)),
+            frappe.MandatoryError,
+        )
 
 
 def _validate_items(items: list):
@@ -615,11 +623,21 @@ def _serialize_invoice(doc) -> dict:
         "due_date":               str(doc.due_date),
         "currency":               doc.currency,
         "selling_price_list":     doc.selling_price_list,
+        "taxes_and_charges":      doc.taxes_and_charges,
         "total":                  flt(doc.total),
         "net_total":              flt(doc.net_total),
         "total_taxes_and_charges":flt(doc.total_taxes_and_charges),
         "grand_total":            flt(doc.grand_total),
         "outstanding_amount":     flt(doc.outstanding_amount),
+        "taxes": [
+            {
+                "charge_type":  row.charge_type,
+                "account_head": row.account_head,
+                "rate":         flt(row.rate),
+                "tax_amount":   flt(row.tax_amount),
+            }
+            for row in doc.get("taxes", [])
+        ],
         "items": [
             {
                 "item_code": row.item_code,
