@@ -40,6 +40,7 @@ from frappe_payments.utils.error_handler import ErrorCode, throw_payment_error, 
 from frappe_payments.utils import authorize_client
 from frappe_payments.api.authorize.charge import (
     _parse_json,
+    _validate_address,
     _validate_items,
     _get_or_create_customer,
     _get_default_company,
@@ -89,8 +90,9 @@ def create_subscription(
         trial_occurrences       int   optional   Number of trial billing cycles (default: 0)
         subscription_name       str   optional   Label shown in Authorize.net dashboard (max 50 chars)
         phone                   str   optional   Contact phone number
-        billing_address         dict  optional   {address_line1, city, state, pincode, country}
-        shipping_address        dict  optional   Same shape; defaults to billing_address.
+        billing_address         dict  required   {address_line1, city, state, pincode, country}
+        shipping_address        dict  required   Same shape as billing_address.
+                                                   Its state determines the tax template.
         notes                   str   optional   Order notes.
 
     Response:
@@ -116,8 +118,11 @@ def create_subscription(
     """
     # --- Deserialise JSON strings sent over HTTP form-data ------------------
     items            = _parse_json(items, "items")
-    billing_address  = _parse_json(billing_address,  "billing_address")  if billing_address  else None
-    shipping_address = _parse_json(shipping_address, "shipping_address") if shipping_address else None
+    # Both addresses are mandatory; tax is always taken from the shipping state
+    billing_address  = _parse_json(billing_address,  "billing_address")
+    shipping_address = _parse_json(shipping_address, "shipping_address")
+    _validate_address(billing_address,  "billing_address")
+    _validate_address(shipping_address, "shipping_address")
 
     # Coerce numeric params that may arrive as strings over form-data
     interval_length   = int(interval_length)   if interval_length   else 1
@@ -141,18 +146,11 @@ def create_subscription(
         customer = _get_or_create_customer(customer_name, email, phone)
         company  = _get_default_company()
 
-        billing_addr_name  = None
-        shipping_addr_name = None
-        if billing_address:
-            billing_addr_name  = _upsert_address(customer, billing_address, "Billing", email, phone)
-            shipping_addr_name = billing_addr_name
+        billing_addr_name  = _upsert_address(customer, billing_address,  "Billing",  email, phone)
+        shipping_addr_name = _upsert_address(customer, shipping_address, "Shipping", email, phone)
 
-        if shipping_address:
-            shipping_addr_name = _upsert_address(customer, shipping_address, "Shipping", email, phone)
-
-        addr_for_state = billing_address or shipping_address
-        state = addr_for_state.get("state") if addr_for_state else None
-        tax_template = _get_tax_template_for_state(state, company) if state else None
+        # Tax is determined by where the goods are delivered (shipping state)
+        tax_template = _get_tax_template_for_state(shipping_address["state"], company)
 
         invoice     = _build_invoice(
             customer=customer,
@@ -275,8 +273,11 @@ def create_subscription_sandbox(
     from frappe_payments.utils import authorize_client
 
     items            = _parse_json(items, "items")
-    billing_address  = _parse_json(billing_address,  "billing_address")  if billing_address  else None
-    shipping_address = _parse_json(shipping_address, "shipping_address") if shipping_address else None
+    # Both addresses are mandatory; tax is always taken from the shipping state
+    billing_address  = _parse_json(billing_address,  "billing_address")
+    shipping_address = _parse_json(shipping_address, "shipping_address")
+    _validate_address(billing_address,  "billing_address")
+    _validate_address(shipping_address, "shipping_address")
 
     interval_length   = int(interval_length)   if interval_length   else 1
     total_occurrences = int(total_occurrences) if total_occurrences else 9999
@@ -317,17 +318,11 @@ def create_subscription_sandbox(
         customer = _get_or_create_customer(customer_name, email, phone)
         company  = _get_default_company()
 
-        billing_addr_name  = None
-        shipping_addr_name = None
-        if billing_address:
-            billing_addr_name  = _upsert_address(customer, billing_address, "Billing", email, phone)
-            shipping_addr_name = billing_addr_name
-        if shipping_address:
-            shipping_addr_name = _upsert_address(customer, shipping_address, "Shipping", email, phone)
+        billing_addr_name  = _upsert_address(customer, billing_address,  "Billing",  email, phone)
+        shipping_addr_name = _upsert_address(customer, shipping_address, "Shipping", email, phone)
 
-        addr_for_state = billing_address or shipping_address
-        state = addr_for_state.get("state") if addr_for_state else None
-        tax_template = _get_tax_template_for_state(state, company) if state else None
+        # Tax is determined by where the goods are delivered (shipping state)
+        tax_template = _get_tax_template_for_state(shipping_address["state"], company)
 
         invoice     = _build_invoice(
             customer=customer,

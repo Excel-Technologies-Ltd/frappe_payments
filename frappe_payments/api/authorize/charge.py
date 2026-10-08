@@ -61,7 +61,7 @@ def charge(
                                                   (e.g. "COMMON.ACCEPT.INAPP.PAYMENT")
         opaque_data_value       str   required   Accept.js dataValue (base64 token)
         phone                   str   optional   Contact phone number
-        billing_address         dict  optional   {
+        billing_address         dict  required   {
                                                    "address_line1": "123 Main St",
                                                    "address_line2": "",
                                                    "city": "New York",
@@ -69,7 +69,8 @@ def charge(
                                                    "pincode": "10001",
                                                    "country": "United States"
                                                  }
-        shipping_address        dict  optional   Same shape; defaults to billing_address.
+        shipping_address        dict  required   Same shape as billing_address.
+                                                   Its state determines the tax template.
         notes                   str   optional   Order notes / delivery instructions.
 
     Response:
@@ -91,8 +92,11 @@ def charge(
     """
     # --- Deserialise JSON strings sent over HTTP form-data ------------------
     items            = _parse_json(items, "items")
-    billing_address  = _parse_json(billing_address,  "billing_address")  if billing_address  else None
-    shipping_address = _parse_json(shipping_address, "shipping_address") if shipping_address else None
+    # Both addresses are mandatory; tax is always taken from the shipping state
+    billing_address  = _parse_json(billing_address,  "billing_address")
+    shipping_address = _parse_json(shipping_address, "shipping_address")
+    _validate_address(billing_address,  "billing_address")
+    _validate_address(shipping_address, "shipping_address")
 
     # --- Basic validation ---------------------------------------------------
     _validate_basic(customer_name, email, opaque_data_descriptor, opaque_data_value, items)
@@ -107,18 +111,11 @@ def charge(
         customer = _get_or_create_customer(customer_name, email, phone)
         company  = _get_default_company()
 
-        billing_addr_name  = None
-        shipping_addr_name = None
-        if billing_address:
-            billing_addr_name  = _upsert_address(customer, billing_address, "Billing", email, phone)
-            shipping_addr_name = billing_addr_name
+        billing_addr_name  = _upsert_address(customer, billing_address,  "Billing",  email, phone)
+        shipping_addr_name = _upsert_address(customer, shipping_address, "Shipping", email, phone)
 
-        if shipping_address:
-            shipping_addr_name = _upsert_address(customer, shipping_address, "Shipping", email, phone)
-
-        addr_for_state = billing_address or shipping_address
-        state = addr_for_state.get("state") if addr_for_state else None
-        tax_template = _get_tax_template_for_state(state, company) if state else None
+        # Tax is determined by where the goods are delivered (shipping state)
+        tax_template = _get_tax_template_for_state(shipping_address["state"], company)
 
         invoice     = _build_invoice(
             customer=customer,
@@ -225,8 +222,11 @@ def charge_sandbox(
       card_code         str  optional  CVV
     """
     items            = _parse_json(items, "items")
-    billing_address  = _parse_json(billing_address,  "billing_address")  if billing_address  else None
-    shipping_address = _parse_json(shipping_address, "shipping_address") if shipping_address else None
+    # Both addresses are mandatory; tax is always taken from the shipping state
+    billing_address  = _parse_json(billing_address,  "billing_address")
+    shipping_address = _parse_json(shipping_address, "shipping_address")
+    _validate_address(billing_address,  "billing_address")
+    _validate_address(shipping_address, "shipping_address")
 
     if not customer_name:
         frappe.throw(_("customer_name is required"), frappe.MandatoryError)
@@ -251,17 +251,11 @@ def charge_sandbox(
         customer = _get_or_create_customer(customer_name, email, phone)
         company  = _get_default_company()
 
-        billing_addr_name  = None
-        shipping_addr_name = None
-        if billing_address:
-            billing_addr_name  = _upsert_address(customer, billing_address, "Billing", email, phone)
-            shipping_addr_name = billing_addr_name
-        if shipping_address:
-            shipping_addr_name = _upsert_address(customer, shipping_address, "Shipping", email, phone)
+        billing_addr_name  = _upsert_address(customer, billing_address,  "Billing",  email, phone)
+        shipping_addr_name = _upsert_address(customer, shipping_address, "Shipping", email, phone)
 
-        addr_for_state = billing_address or shipping_address
-        state = addr_for_state.get("state") if addr_for_state else None
-        tax_template = _get_tax_template_for_state(state, company) if state else None
+        # Tax is determined by where the goods are delivered (shipping state)
+        tax_template = _get_tax_template_for_state(shipping_address["state"], company)
 
         invoice     = _build_invoice(
             customer=customer,
@@ -380,6 +374,21 @@ def _validate_basic(
             frappe.throw(
                 _("Row {0}: qty must be greater than 0").format(idx), frappe.ValidationError
             )
+
+
+REQUIRED_ADDRESS_FIELDS = ("address_line1", "city", "state", "country")
+
+
+def _validate_address(addr, field_name: str):
+    if not addr or not isinstance(addr, dict):
+        frappe.throw(_("{0} is required").format(field_name), frappe.MandatoryError)
+
+    missing = [f for f in REQUIRED_ADDRESS_FIELDS if not str(addr.get(f) or "").strip()]
+    if missing:
+        frappe.throw(
+            _("{0}: missing required field(s): {1}").format(field_name, ", ".join(missing)),
+            frappe.MandatoryError,
+        )
 
 
 def _validate_items(items: list):
